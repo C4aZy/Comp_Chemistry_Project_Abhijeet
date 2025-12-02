@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>PES Analysis - Research Lab Edition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        .container {
+            max-width: 1400px; margin: 0 auto; background: white;
+            border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);
+            color: white; padding: 30px; text-align: center;
+        }
+        .header h1 { font-size: 2em; margin-bottom: 10px; }
+        .badge {
+            background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px;
+            font-size: 0.85em; display: inline-block; margin: 5px;
+        }
+        .content { display: grid; grid-template-columns: 400px 1fr; gap: 20px; padding: 30px; }
+        .sidebar { background: #f8f9fa; padding: 20px; border-radius: 8px; max-height: calc(100vh - 200px); overflow-y: auto; }
+        .main-content { display:flex; flex-direction: column; gap: 20px; }
+        .section { background: #f8f9fa; padding: 25px; border-radius: 8px; }
+        .section h2 { color: #1e3c72; margin-bottom: 20px; font-size: 1.3em; border-bottom: 2px solid #1e3c72; padding-bottom: 10px; }
+        .input-group { display:flex; gap:10px; margin-bottom:15px; }
+        .input-group input { flex:1; padding:12px; border:2px solid #ddd; border-radius:6px; font-size:14px; transition: border-color 0.3s; }
+        .input-group input:focus { outline:none; border-color:#1e3c72; }
+        button {
+            background: linear-gradient(135deg,#1e3c72 0%,#2a5298 100%); color:white; border:none;
+            padding:12px 24px; border-radius:6px; cursor:pointer; font-size:14px; font-weight:600;
+            transition: transform 0.2s, box-shadow 0.2s; white-space:nowrap;
+        }
+        button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(30,60,114,0.4); }
+        button:active { transform: translateY(0); }
+        button:disabled { opacity:0.5; cursor:not-allowed; }
+        .btn-success { background: linear-gradient(135deg,#28a745 0%,#20c997 100%); }
+        .btn-danger { background: linear-gradient(135deg,#dc3545 0%,#c82333 100%); }
+        .btn-warning { background: linear-gradient(135deg,#ffc107 0%,#ff9800 100%); }
+        .file-upload { border: 2px dashed #1e3c72; padding: 20px; text-align: center; border-radius: 8px; margin-bottom: 15px; cursor: pointer; transition: all 0.3s; }
+        .file-upload:hover { background:#e3f2fd; border-color:#2a5298; }
+        .file-upload input { display:none; }
+        .data-table { margin-top:20px; max-height:300px; overflow-y:auto; }
+        table { width:100%; border-collapse:collapse; font-size:13px; }
+        th { background:#1e3c72; color:white; padding:10px; text-align:left; position: sticky; top:0; font-size:12px; }
+        td { padding:8px 10px; border-bottom:1px solid #ddd; }
+        tr:hover { background:#f0f0f0; }
+        .delete-btn { background:#dc3545; padding:4px 8px; font-size:11px; color:white; border:none; border-radius:4px; cursor:pointer;}
+        .summary-box { background:#e8f5e9; padding:15px; border-radius:8px; margin-top:15px; border-left:4px solid #4caf50; }
+        .analysis-results { background:#fff3cd; padding:15px; border-radius:8px; margin-top:15px; border-left:4px solid #ffc107; }
+        .analysis-results h3 { color:#856404; margin-bottom:10px; font-size:1.1em; }
+        .critical-point { background:white; padding:10px; margin:8px 0; border-radius:4px; font-size:12px; }
+        .critical-point.minimum { border-left:3px solid #28a745; }
+        .critical-point.maximum { border-left:3px solid #dc3545; }
+        .chart-container { position:relative; height:400px; margin-top:20px; }
+        .actions { display:flex; gap:8px; margin-top:15px; flex-wrap:wrap; }
+        .matplotlib-plot { width:100%; border-radius:8px; margin-top:15px; box-shadow:0 2px 10px rgba(0,0,0,0.1); }
+        .alert { padding:12px 20px; border-radius:6px; margin-bottom:15px; display:none; font-size:14px; }
+        .alert.success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
+        .alert.error { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
+        .stats-grid { display:grid; grid-template-columns: repeat(2,1fr); gap:10px; margin-top:15px; }
+        .stat-card { background:white; padding:12px; border-radius:6px; text-align:center; font-size:12px; }
+        .stat-value { font-size:20px; font-weight:bold; color:#1e3c72; }
+        .stat-label { color:#666; margin-top:5px; }
+        .conform-section { background: linear-gradient(180deg,#ffffff,#fbfbff); padding:15px; border-radius:8px; border-left:4px solid #6f42c1; margin-top:15px;}
+        @media (max-width:1200px) { .content { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔬 PES ANALYSIS TOOL</h1>
+            <p>Computational Chemistry Research Lab Edition</p>
+            <div>
+                <span class="badge">⚡ Flask + Python</span>
+                <span class="badge">📊 Advanced Analysis</span>
+                <span class="badge">🧪 File Upload Support</span>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <h2 style="color:#1e3c72; margin-bottom:15px;">Data Input</h2>
+                <div id="alert" class="alert"></div>
+
+                <!-- File upload -->
+                <div class="file-upload" onclick="document.getElementById('fileInput').click()">
+                    <p style="margin:0; font-weight:600;">📁 Upload File</p>
+                    <p style="margin:5px 0 0 0; font-size:12px; color:#666;">Gaussian .log, ORCA .out, CSV, or TXT</p>
+                    <input type="file" id="fileInput" accept=".log,.out,.csv,.txt" onchange="uploadFile()">
+                </div>
+
+                <!-- Manual entry -->
+                <div style="margin-top:20px;">
+                    <p style="font-weight:600; margin-bottom:10px;">Manual Entry:</p>
+                    <div class="input-group">
+                        <input type="number" id="angleInput" placeholder="Angle (°)" step="any">
+                        <input type="number" id="energyInput" placeholder="Energy (kJ/mol)" step="any">
+                    </div>
+                    <button onclick="addDataPoint()" style="width:100%;">Add Point</button>
+                </div>
+
+                <!-- Data table -->
+                <div class="data-table">
+                    <table id="dataTable">
+                        <thead>
+                            <tr><th>Angle (°)</th><th>Energy</th><th>Action</th></tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+
+                <!-- Actions -->
+                <div class="actions">
+                    <button onclick="runAdvancedAnalysis()" class="btn-success">🔬 Analyze</button>
+                    <button onclick="downloadCSV()">📥 CSV</button>
+                    <button onclick="exportReport()">📄 Report</button>
+                    <button onclick="clearAll()" class="btn-danger">🗑️ Clear</button>
+                </div>
+
+                <!-- Summary -->
+                <div id="summary" class="summary-box" style="display:none;">
+                    <h3>Global Minimum</h3>
+                    <p><strong>Energy:</strong> <span id="minEnergy"></span> kJ/mol</p>
+                    <p><strong>Angle:</strong> <span id="minAngle"></span>°</p>
+                </div>
+
+                <!-- Statistics -->
+                <div id="statistics" style="display:none; margin-top:15px;">
+                    <h3 style="color:#1e3c72; font-size:1.1em; margin-bottom:10px;">Statistics</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="numPoints">0</div>
+                            <div class="stat-label">Data Points</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="energyRange">0</div>
+                            <div class="stat-label">Energy Range (kJ/mol)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main content -->
+            <div class="main-content">
+                <!-- Interactive Visualization -->
+                <div class="section">
+                    <h2>Interactive Visualization</h2>
+                    <div class="chart-container">
+                        <canvas id="pesChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Advanced Analysis Results -->
+                <div id="analysisSection" class="section" style="display:none;">
+                    <h2>Advanced Analysis Results</h2>
+                    <div id="analysisResults"></div>
+                    <div style="margin-top:20px;">
+                        <button onclick="generateAdvancedPlot()" class="btn-warning">🐍 Generate Annotated Plot</button>
+                        <button onclick="downloadMatplotlibPlot()">📊 Download Plot</button>
+                    </div>
+                    <img id="matplotlibImage" class="matplotlib-plot" style="display:none;" />
+                </div>
+
+                <!-- Dedicated Conformational Stability Section (new card) -->
+                <div id="conformationalSection" class="section conform-section" style="display:none;">
+                    <h2>Conformational Stability</h2>
+                    <div id="conformationalResults">
+                        <!-- Filled dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // === Chart initialization ===
+    let chart = null;
+    function initChart() {
+        const ctx = document.getElementById('pesChart').getContext('2d');
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Energy (kJ/mol)',
+                    data: [],
+                    borderColor: '#1e3c72',
+                    backgroundColor: 'rgba(30,60,114,0.1)',
+                    borderWidth: 3,
+                    pointRadius: 6,
+                    pointBackgroundColor: '#1e3c72',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: true, position: 'top' } },
+                scales: {
+                    x: { title: { display: true, text: 'Angle (°)', font: { size: 14, weight: 'bold' } } },
+                    y: { title: { display: true, text: 'Energy (kJ/mol)', font: { size: 14, weight: 'bold' } } }
+                }
+            }
+        });
+    }
+
+    // === UI helpers ===
+    function showAlert(message, type) {
+        const alert = document.getElementById('alert');
+        alert.textContent = message;
+        alert.className = `alert ${type}`;
+        alert.style.display = 'block';
+        setTimeout(() => { alert.style.display = 'none'; }, 4000);
+    }
+
+    async function uploadFile() {
+        const fileInput = document.getElementById('fileInput');
+        const file = fileInput.files[0];
+        if (!file) return;
+        const formData = new FormData(); formData.append('file', file);
+        try {
+            const response = await fetch('/upload_file', { method: 'POST', body: formData });
+            const result = await response.json();
+            if (result.status === 'success') {
+                await loadData();
+                showAlert(`File uploaded! ${result.count} points loaded.`, 'success');
+            } else {
+                showAlert('Error: ' + result.message, 'error');
+            }
+        } catch (error) {
+            showAlert('Upload failed: ' + error, 'error');
+        }
+        fileInput.value = '';
+    }
+
+    async function addDataPoint() {
+        const angle = parseFloat(document.getElementById('angleInput').value);
+        const energy = parseFloat(document.getElementById('energyInput').value);
+        if (isNaN(angle) || isNaN(energy)) { showAlert('Enter valid numbers for angle and energy', 'error'); return; }
+        try {
+            const response = await fetch('/add_point', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ angle, energy })
+            });
+            const result = await response.json();
+            if (result.status === 'success') {
+                document.getElementById('angleInput').value = ''; document.getElementById('energyInput').value = '';
+                await loadData(); showAlert('Data point added', 'success');
+            } else {
+                showAlert('Error adding point', 'error');
+            }
+        } catch (error) {
+            showAlert('Connection error', 'error');
+        }
+    }
+
+    async function loadData() {
+        try {
+            const response = await fetch('/get_data');
+            const result = await response.json();
+            updateTable(result.data);
+            updateChart(result.data);
+            await updateSummary();
+            updateStatistics(result.data);
+        } catch (error) {
+            console.error('Error loading data:', error);
+        }
+    }
+
+    function updateTable(data) {
+        const tbody = document.getElementById('tableBody'); tbody.innerHTML = '';
+        data.forEach((point, index) => {
+            const row = tbody.insertRow();
+            row.innerHTML = `<td>${point.angle.toFixed(1)}</td>
+                             <td>${point.energy.toFixed(3)}</td>
+                             <td><button class="delete-btn" onclick="deletePoint(${index})">×</button></td>`;
+        });
+    }
+
+    function updateChart(data) {
+        chart.data.labels = data.map(p => p.angle);
+        chart.data.datasets[0].data = data.map(p => p.energy);
+        chart.update();
+    }
+
+    function updateStatistics(data) {
+        if (data.length === 0) { document.getElementById('statistics').style.display = 'none'; return; }
+        const energies = data.map(p => p.energy);
+        const range = (Math.max(...energies) - Math.min(...energies)).toFixed(2);
+        document.getElementById('numPoints').textContent = data.length;
+        document.getElementById('energyRange').textContent = range;
+        document.getElementById('statistics').style.display = 'block';
+    }
+
+    async function updateSummary() {
+        try {
+            const response = await fetch('/get_summary');
+            const result = await response.json();
+            if (result.status === 'success') {
+                document.getElementById('minEnergy').textContent = result.lowest_energy.toFixed(6);
+                document.getElementById('minAngle').textContent = result.lowest_angle.toFixed(2);
+                document.getElementById('summary').style.display = 'block';
+            } else {
+                document.getElementById('summary').style.display = 'none';
+            }
+        } catch (error) {
+            document.getElementById('summary').style.display = 'none';
+        }
+    }
+
+    async function runAdvancedAnalysis() {
+        try {
+            const response = await fetch('/advanced_analysis');
+            const result = await response.json();
+            if (result.status === 'success') {
+                displayAnalysisResults(result);
+                displayConformationalStability(result); // show dedicated section
+                document.getElementById('analysisSection').style.display = 'block';
+                showAlert('Analysis complete!', 'success');
+            } else {
+                showAlert(result.message, 'error');
+            }
+        } catch (error) {
+            showAlert('Analysis failed', 'error');
+        }
+    }
+
+    function displayAnalysisResults(data) {
+        let html = '';
+
+        // Global minimum
+        html += `<div class="summary-box">
+            <h3>Global Minimum</h3>
+            <p><strong>Angle:</strong> ${data.global_minimum.angle.toFixed(2)}°</p>
+            <p><strong>Energy:</strong> ${data.global_minimum.energy.toFixed(6)} kJ/mol</p>
+        </div>`;
+
+        // Local minima
+        if (data.local_minima && data.local_minima.length > 0) {
+            html += `<div class="analysis-results">
+                <h3>Local Minima (${data.local_minima.length})</h3>`;
+            data.local_minima.forEach((min, i) => {
+                html += `<div class="critical-point minimum">
+                    <strong>Minimum ${i+1}:</strong> ${min.angle.toFixed(2)}° |
+                    ${min.energy.toFixed(6)} kJ/mol |
+                    Relative: ${min.relative_energy.toFixed(4)} kJ/mol
+                </div>`;
+            });
+            html += `</div>`;
+        }
+
+        // Transition states
+        if (data.transition_states && data.transition_states.length > 0) {
+            html += `<div class="analysis-results">
+                <h3>Transition States (${data.transition_states.length})</h3>`;
+            data.transition_states.forEach((max, i) => {
+                html += `<div class="critical-point maximum">
+                    <strong>TS ${i+1}:</strong> ${max.angle.toFixed(2)}° |
+                    ${max.energy.toFixed(6)} kJ/mol |
+                    Relative: ${max.relative_energy.toFixed(4)} kJ/mol
+                </div>`;
+            });
+            html += `</div>`;
+        }
+
+        // Energy barriers
+        if (data.energy_barriers && data.energy_barriers.length > 0) {
+            html += `<div class="analysis-results">
+                <h3>Energy Barriers</h3>`;
+            data.energy_barriers.forEach((barrier, i) => {
+                html += `<div class="critical-point">
+                    <strong>Barrier ${i+1}:</strong> ${barrier.from_angle.toFixed(2)}° → ${barrier.to_angle.toFixed(2)}°<br>
+                    Height: ${barrier.barrier_height.toFixed(4)} kJ/mol (${barrier.barrier_kcal.toFixed(4)} kcal/mol)
+                </div>`;
+            });
+            html += `</div>`;
+        }
+
+        document.getElementById('analysisResults').innerHTML = html;
+    }
+
+    // --- NEW: dedicated Conformational Stability section rendering ---
+    function displayConformationalStability(data) {
+        const cs = data.conformational_stability;
+        const resultsDiv = document.getElementById('conformationalResults');
+
+        if (!cs) {
+            resultsDiv.innerHTML = `<div class="critical-point">No conformational stability data available.</div>`;
+            document.getElementById('conformationalSection').style.display = 'none';
+            return;
+        }
+
+        // Build HTML
+        let html = '';
+        html += `<div class="analysis-results">
+                    <h3>Summary</h3>
+                    <div class="critical-point">
+                        <strong>Most Stable Conformation:</strong><br>
+                        Angle: ${cs.most_stable_angle.toFixed(2)}°<br>
+                        Energy: ${cs.most_stable_energy.toFixed(6)} kJ/mol
+                    </div>
+
+                    <div class="critical-point">
+                        <strong>Least Stable Conformation:</strong><br>
+                        Angle: ${cs.least_stable_angle.toFixed(2)}°<br>
+                        Energy: ${cs.least_stable_energy.toFixed(6)} kJ/mol
+                    </div>
+
+                    <div class="critical-point">
+                        <strong>Stability Range:</strong><br>
+                        ${cs.stability_range_kj.toFixed(4)} kJ/mol (${cs.stability_range_kcal.toFixed(4)} kcal/mol)
+                    </div>
+                 </div>`;
+
+        // Boltzmann population summary (top 5)
+        if (cs.boltzmann_population && cs.boltzmann_population.length > 0) {
+            // Create array of {index, pop}
+            const pops = cs.boltzmann_population.map((p, idx) => ({ idx: idx, p: p }));
+            // Sort descending by population
+            pops.sort((a, b) => b.p - a.p);
+            const topN = Math.min(5, pops.length);
+
+            html += `<div class="analysis-results">
+                        <h3>Boltzmann Population (top ${topN})</h3>
+                        <div class="critical-point">
+                            <p style="font-size:13px; margin-bottom:8px;">The populations correspond to the points in the input dataset (index starting at 0).</p>
+                            <ol style="margin-left:18px;">`;
+            for (let i = 0; i < topN; i++) {
+                const item = pops[i];
+                html += `<li>Point index ${item.idx}: ${ (item.p * 100).toFixed(4) } %</li>`;
+            }
+            html += `       </ol>
+                        </div>
+                    </div>`;
+        }
+
+        // Optional: show full table of populations
+        if (cs.boltzmann_population && cs.boltzmann_population.length <= 30) {
+            html += `<div class="analysis-results">
+                        <h3>Full Boltzmann Populations</h3>
+                        <div class="critical-point">
+                            <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                                <thead><tr style="background:#1e3c72; color:white;"><th style="padding:6px; text-align:left;">Index</th><th style="padding:6px; text-align:left;">Population (%)</th></tr></thead>
+                                <tbody>`;
+            cs.boltzmann_population.forEach((p, idx) => {
+                html += `<tr><td style="padding:6px;">${idx}</td><td style="padding:6px;">${ (p * 100).toFixed(6) }%</td></tr>`;
+            });
+            html += `           </tbody>
+                            </table>
+                        </div>
+                    </div>`;
+        } else {
+            // If too many points, provide note
+            if (cs.boltzmann_population && cs.boltzmann_population.length > 30) {
+                html += `<div class="analysis-results">
+                            <h3>Boltzmann Populations</h3>
+                            <div class="critical-point">
+                                Populations available for ${cs.boltzmann_population.length} points. Download the analysis report for full details.
+                            </div>
+                         </div>`;
+            }
+        }
+
+        resultsDiv.innerHTML = html;
+        document.getElementById('conformationalSection').style.display = 'block';
+    }
+
+    async function generateAdvancedPlot() {
+        try {
+            const response = await fetch('/generate_advanced_plot');
+            const result = await response.json();
+            if (result.status === 'success') {
+                const img = document.getElementById('matplotlibImage');
+                img.src = result.image; img.style.display = 'block';
+                showAlert('Advanced plot generated!', 'success');
+            } else {
+                showAlert(result.message, 'error');
+            }
+        } catch (error) {
+            showAlert('Plot generation failed', 'error');
+        }
+    }
+
+    async function deletePoint(index) {
+        try {
+            const response = await fetch(`/delete_point/${index}`, { method: 'DELETE' });
+            const result = await response.json();
+            if (result.status === 'success') { await loadData(); showAlert('Point deleted', 'success'); }
+        } catch (error) { showAlert('Deletion failed', 'error'); }
+    }
+
+    async function clearAll() {
+        if (!confirm('Clear all data?')) return;
+        try {
+            const response = await fetch('/clear_data', { method: 'POST' });
+            const result = await response.json();
+            if (result.status === 'success') {
+                await loadData();
+                document.getElementById('matplotlibImage').style.display = 'none';
+                document.getElementById('analysisSection').style.display = 'none';
+                document.getElementById('conformationalSection').style.display = 'none';
+                showAlert('Data cleared', 'success');
+            }
+        } catch (error) { showAlert('Clear failed', 'error'); }
+    }
+
+    function downloadCSV() {
+        window.location.href = '/download_csv';
+        showAlert('CSV download started', 'success');
+    }
+
+    function downloadMatplotlibPlot() {
+        window.location.href = '/download_plot';
+        showAlert('Plot download started', 'success');
+    }
+
+    function exportReport() {
+        window.location.href = '/export_analysis_report';
+        showAlert('Report export started', 'success');
+    }
+
+    // Keyboard Enter support
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('angleInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') document.getElementById('energyInput').focus();
+        });
+        document.getElementById('energyInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') addDataPoint();
+        });
+
+        // Initialize chart + load data
+        initChart();
+        loadData();
+    });
+    </script>
+</body>
+</html>
