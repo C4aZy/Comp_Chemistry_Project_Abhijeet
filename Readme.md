@@ -74,14 +74,6 @@ Teaching computational chemistry
 Quick validation of scan convergence
 
 
-File Structure (for GitHub)
-textpes-analysis-tool/
-├── app.py
-├── templates/
-│   └── index.html
-├── uploads/               # created automatically
-└── README.md
-
 Why This Tool Exists
 Because every computational chemist has done this 100 times:
 “Let me just copy the scan energies… find the minimum… calculate ΔG… make a plot in Origin… ugh.”
